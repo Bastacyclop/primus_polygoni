@@ -1,0 +1,12 @@
+[package]
+name = "primus_polygoni"
+version = "0.1.0"
+authors = ["Thomas Koehler <basta.t.k+git@gmail.com>"]
+
+[dependencies]
+gfx = { git = "git://github.com/gfx-rs/gfx", rev = "606db695be7fee025b6278a7dfe759020b3c4eb3"}
+gfx_app = { git = "git://github.com/gfx-rs/gfx", rev = "606db695be7fee025b6278a7dfe759020b3c4eb3"}
+winit = "^0.5"
+nalgebra = "^0.11"
+alga = "^0.5"
+rand = "^0.3"
