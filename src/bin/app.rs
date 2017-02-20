@@ -3,7 +3,6 @@ use primus_polygoni::gfx;
 use primus_polygoni::gfx_app;
 use primus_polygoni::winit;
 
-use std::mem;
 use primus_polygoni::{Vertex, Locals, Camera};
 
 struct App<R: gfx::Resources> {
@@ -20,35 +19,35 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
 
         let vertex_data = &[
             // top (0, 0, 0.5)
-            Vertex::new([-0.5, -0.5,  0.5]),
-            Vertex::new([ 0.5, -0.5,  0.5]),
-            Vertex::new([ 0.5,  0.5,  0.5]),
-            Vertex::new([-0.5,  0.5,  0.5]),
+            Vertex::new([-0.5, -0.5,  0.5], [0.9, 0.2, 0.1]),
+            Vertex::new([ 0.5, -0.5,  0.5], [0.9, 0.2, 0.1]),
+            Vertex::new([ 0.5,  0.5,  0.5], [0.9, 0.2, 0.1]),
+            Vertex::new([-0.5,  0.5,  0.5], [0.9, 0.2, 0.1]),
             // bottom (0, 0, -0.5)
-            Vertex::new([-0.5,  0.5, -0.5]),
-            Vertex::new([ 0.5,  0.5, -0.5]),
-            Vertex::new([ 0.5, -0.5, -0.5]),
-            Vertex::new([-0.5, -0.5, -0.5]),
+            Vertex::new([-0.5,  0.5, -0.5], [0.1, 0.8, 0.9]),
+            Vertex::new([ 0.5,  0.5, -0.5], [0.1, 0.8, 0.9]),
+            Vertex::new([ 0.5, -0.5, -0.5], [0.1, 0.8, 0.9]),
+            Vertex::new([-0.5, -0.5, -0.5], [0.1, 0.8, 0.9]),
             // right (0.5, 0, 0)
-            Vertex::new([ 0.5, -0.5, -0.5]),
-            Vertex::new([ 0.5,  0.5, -0.5]),
-            Vertex::new([ 0.5,  0.5,  0.5]),
-            Vertex::new([ 0.5, -0.5,  0.5]),
+            Vertex::new([ 0.5, -0.5, -0.5], [0.2, 0.9, 0.1]),
+            Vertex::new([ 0.5,  0.5, -0.5], [0.2, 0.9, 0.1]),
+            Vertex::new([ 0.5,  0.5,  0.5], [0.2, 0.9, 0.1]),
+            Vertex::new([ 0.5, -0.5,  0.5], [0.2, 0.9, 0.1]),
             // left (-0.5, 0, 0)
-            Vertex::new([-0.5, -0.5,  0.5]),
-            Vertex::new([-0.5,  0.5,  0.5]),
-            Vertex::new([-0.5,  0.5, -0.5]),
-            Vertex::new([-0.5, -0.5, -0.5]),
+            Vertex::new([-0.5, -0.5,  0.5], [0.8, 0.1, 0.9]),
+            Vertex::new([-0.5,  0.5,  0.5], [0.8, 0.1, 0.9]),
+            Vertex::new([-0.5,  0.5, -0.5], [0.8, 0.1, 0.9]),
+            Vertex::new([-0.5, -0.5, -0.5], [0.8, 0.1, 0.9]),
             // front (0, 0.5, 0)
-            Vertex::new([ 0.5,  0.5, -0.5]),
-            Vertex::new([-0.5,  0.5, -0.5]),
-            Vertex::new([-0.5,  0.5,  0.5]),
-            Vertex::new([ 0.5,  0.5,  0.5]),
+            Vertex::new([ 0.5,  0.5, -0.5], [0.2, 0.1, 0.9]),
+            Vertex::new([-0.5,  0.5, -0.5], [0.2, 0.1, 0.9]),
+            Vertex::new([-0.5,  0.5,  0.5], [0.2, 0.1, 0.9]),
+            Vertex::new([ 0.5,  0.5,  0.5], [0.2, 0.1, 0.9]),
             // back (0, -0.5, 0)
-            Vertex::new([ 0.5, -0.5,  0.5]),
-            Vertex::new([-0.5, -0.5,  0.5]),
-            Vertex::new([-0.5, -0.5, -0.5]),
-            Vertex::new([ 0.5, -0.5, -0.5]),
+            Vertex::new([ 0.5, -0.5,  0.5], [0.8, 0.9, 0.1]),
+            Vertex::new([-0.5, -0.5,  0.5], [0.8, 0.9, 0.1]),
+            Vertex::new([-0.5, -0.5, -0.5], [0.8, 0.9, 0.1]),
+            Vertex::new([ 0.5, -0.5, -0.5], [0.8, 0.9, 0.1]),
         ];
 
         let index_data: &[u16] = &[
@@ -80,9 +79,9 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
 
     fn render<C: gfx::CommandBuffer<R>>(&mut self, encoder: &mut gfx::Encoder<R, C>) {
         self.camera.update(self.aspect_ratio);
-        let locals = unsafe { Locals { // FIXME
-            transform: *mem::transmute::<_, &[[f32; 4]; 4]>(self.camera.transform().as_slice().as_ptr())
-        } };
+        let locals = Locals { 
+            transform: self.camera.gpu_transform()
+        };
         encoder.update_constant_buffer(&self.bundle.data.locals, &locals);
 
         encoder.clear(&self.bundle.data.color_target, [0.1, 0.2, 0.3, 1.0]);
@@ -102,12 +101,21 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
         match event {
             KeyboardInput(Pressed, _, Some(key)) => {
                 use winit::VirtualKeyCode::*;
-                let move_step = 0.01;
+                let move_step = 0.05;
+                let angle_step = 0.314;
                 match key {
                     Left => self.camera.move_right(-move_step),
-                    Down => self.camera.move_ahead(-move_step),
                     Right => self.camera.move_right(move_step),
+                    Down => self.camera.move_ahead(-move_step),
                     Up => self.camera.move_ahead(move_step),
+                    PageDown => self.camera.move_up(-move_step),
+                    PageUp => self.camera.move_up(move_step),
+                    Z => self.camera.pitch(angle_step),
+                    S => self.camera.pitch(-angle_step),
+                    Q => self.camera.yaw(angle_step),
+                    D => self.camera.yaw(-angle_step),
+                    A => self.camera.roll(angle_step),
+                    E => self.camera.roll(-angle_step),
                     _ => {}
                 }
             },

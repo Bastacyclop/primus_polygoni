@@ -14,6 +14,7 @@ pub use gfx_app::{ColorFormat, DepthFormat};
 gfx_defines! {
     vertex Vertex {
         pos: [f32; 4] = "a_Pos",
+        color: [f32; 3] = "a_Color",
     }
 
     constant Locals {
@@ -30,9 +31,10 @@ gfx_defines! {
 }
 
 impl Vertex {
-    pub fn new(pos: [f32; 3]) -> Vertex {
+    pub fn new(pos: [f32; 3], color: [f32; 3]) -> Vertex {
         Vertex {
-            pos: [pos[0], pos[1], pos[2], 1.0]
+            pos: [pos[0], pos[1], pos[2], 1.0],
+            color: color,
         }
     }
 }
@@ -54,9 +56,13 @@ pub fn create_pipeline<R, F>(factory: &mut F,
         .. gfx_app::shade::Source::empty()
     };
 
-    factory.create_pipeline_simple(
-        vs.select(backend).unwrap(),
-        fs.select(backend).unwrap(),
+    let program = factory.link_program(vs.select(backend).unwrap(),
+                                       fs.select(backend).unwrap()).unwrap();
+
+    factory.create_pipeline_from_program(
+        &program,
+        gfx::Primitive::TriangleList,
+        gfx::state::Rasterizer::new_fill(),
         pipe::new()
     ).unwrap()
 }
