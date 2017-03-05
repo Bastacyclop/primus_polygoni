@@ -119,8 +119,14 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
                     _ => {}
                 }
             },
-            MouseMoved(_x, _y) => {
-                
+            MouseMoved(x, y) => {
+                // let (w, h) = window.get_inner_size_pixels();
+                let (w, h, _, _) = self.bundle.data.color_target.get_dimensions();
+                let dx = (x as f32 / w as f32) - 0.5;
+                let dy = (y as f32 / h as f32) - 0.5;
+                self.camera.yaw(-dx / 60.0);
+                self.camera.pitch(-dy / 60.0);
+                // window.set_cursor_position(w / 2, h / 2)
             }
             MouseWheel(_delta, _) => {
                 
