@@ -1,9 +1,9 @@
 #version 150 core
 
 in vec4 a_Pos;
-in vec3 a_Color;
+in vec2 a_TexCoord;
 
-out vec3 v_Color;
+out vec2 v_TexCoord;
 
 uniform Locals {
     mat4 u_Transform;
@@ -11,6 +11,6 @@ uniform Locals {
 
 void main() {
     gl_Position = u_Transform * a_Pos;
-    v_Color = a_Color;
+    v_TexCoord = a_TexCoord;
     // gl_ClipDistance[0] = 1.0;
 }

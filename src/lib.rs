@@ -5,16 +5,19 @@ pub extern crate winit;
 pub extern crate alga;
 pub extern crate nalgebra;
 extern crate rand;
+extern crate noise;
 
 mod camera;
+mod texture;
 
 pub use camera::Camera;
+pub use texture::generate as generate_texture;
 pub use gfx_app::{ColorFormat, DepthFormat};
 
 gfx_defines! {
     vertex Vertex {
         pos: [f32; 4] = "a_Pos",
-        color: [f32; 3] = "a_Color",
+        tex_coord: [f32; 2] = "a_TexCoord",
     }
 
     constant Locals {
@@ -24,6 +27,7 @@ gfx_defines! {
     pipeline pipe {
         vertices: gfx::VertexBuffer<Vertex> = (),
         locals: gfx::ConstantBuffer<Locals> = "Locals",
+        color: gfx::TextureSampler<[f32; 4]> = "t_Color",
         color_target: gfx::RenderTarget<ColorFormat> = "Target0",
         depth_target: gfx::DepthTarget<DepthFormat> =
             gfx::preset::depth::LESS_EQUAL_WRITE,
@@ -31,10 +35,10 @@ gfx_defines! {
 }
 
 impl Vertex {
-    pub fn new(pos: [f32; 3], color: [f32; 3]) -> Vertex {
+    pub fn new(pos: [f32; 3], tex_coord: [f32; 2]) -> Vertex {
         Vertex {
             pos: [pos[0], pos[1], pos[2], 1.0],
-            color: color,
+            tex_coord: tex_coord,
         }
     }
 }
@@ -48,11 +52,13 @@ pub fn create_pipeline<R, F>(factory: &mut F,
 
     let vs = gfx_app::shade::Source {
         glsl_150: include_bytes!("shader/main_150.glslv"),
+        hlsl_40: include_bytes!("../data/vertex.fx"),
         .. gfx_app::shade::Source::empty()
     };
 
     let fs = gfx_app::shade::Source {
         glsl_150: include_bytes!("shader/main_150.glslf"),
+        hlsl_40: include_bytes!("../data/pixel.fx"),
         .. gfx_app::shade::Source::empty()
     };
 

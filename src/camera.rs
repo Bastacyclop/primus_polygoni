@@ -35,7 +35,7 @@ impl Camera {
     fn compute_view(&self) -> Matrix4<f32> {
         Isometry3::look_at_rh(
             &self.position,
-            &(self.position + self.orientation * Vector3::z()),
+            &(self.position + self.ahead()),
             &(self.orientation * Vector3::y())
         ).to_homogeneous()
     }
@@ -51,7 +51,7 @@ impl Camera {
         unsafe { *mem::transmute::<_, &[[f32; 4]; 4]>(ptr) }
     }
 
-    fn rotate(&mut self, r: UnitQuaternion<f32>) {
+    pub fn rotate(&mut self, r: UnitQuaternion<f32>) {
         self.orientation = r * self.orientation;
     }
 
@@ -79,6 +79,10 @@ impl Camera {
     }
 
     pub fn move_ahead(&mut self, d: f32) {
-        self.position += self.orientation * Vector3::z() * d;
+        self.position += self.ahead() * d;
+    }
+
+    pub fn ahead(&self) -> Vector3<f32> {
+        self.orientation * Vector3::z()
     }
 }

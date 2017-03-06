@@ -2,6 +2,7 @@ extern crate primus_polygoni;
 use primus_polygoni::gfx;
 use primus_polygoni::gfx_app;
 use primus_polygoni::winit;
+use primus_polygoni::nalgebra::{Vector2, Vector3, UnitQuaternion};
 
 use primus_polygoni::{Vertex, Locals, Camera};
 
@@ -9,6 +10,8 @@ struct App<R: gfx::Resources> {
     bundle: gfx::Bundle<R, primus_polygoni::pipe::Data<R>>,
     camera: Camera,
     aspect_ratio: f32,
+    mouse: Vector2<f32>,
+    head_spinning: bool,
 }
 
 impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
@@ -19,35 +22,35 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
 
         let vertex_data = &[
             // top (0, 0, 0.5)
-            Vertex::new([-0.5, -0.5,  0.5], [0.9, 0.2, 0.1]),
-            Vertex::new([ 0.5, -0.5,  0.5], [0.9, 0.2, 0.1]),
-            Vertex::new([ 0.5,  0.5,  0.5], [0.9, 0.2, 0.1]),
-            Vertex::new([-0.5,  0.5,  0.5], [0.9, 0.2, 0.1]),
+            Vertex::new([-0.5, -0.5,  0.5], [0., 0.]),
+            Vertex::new([ 0.5, -0.5,  0.5], [1., 0.]),
+            Vertex::new([ 0.5,  0.5,  0.5], [1., 1.]),
+            Vertex::new([-0.5,  0.5,  0.5], [0., 1.]),
             // bottom (0, 0, -0.5)
-            Vertex::new([-0.5,  0.5, -0.5], [0.1, 0.8, 0.9]),
-            Vertex::new([ 0.5,  0.5, -0.5], [0.1, 0.8, 0.9]),
-            Vertex::new([ 0.5, -0.5, -0.5], [0.1, 0.8, 0.9]),
-            Vertex::new([-0.5, -0.5, -0.5], [0.1, 0.8, 0.9]),
+            Vertex::new([-0.5,  0.5, -0.5], [1., 0.]),
+            Vertex::new([ 0.5,  0.5, -0.5], [0., 0.]),
+            Vertex::new([ 0.5, -0.5, -0.5], [0., 1.]),
+            Vertex::new([-0.5, -0.5, -0.5], [1., 1.]),
             // right (0.5, 0, 0)
-            Vertex::new([ 0.5, -0.5, -0.5], [0.2, 0.9, 0.1]),
-            Vertex::new([ 0.5,  0.5, -0.5], [0.2, 0.9, 0.1]),
-            Vertex::new([ 0.5,  0.5,  0.5], [0.2, 0.9, 0.1]),
-            Vertex::new([ 0.5, -0.5,  0.5], [0.2, 0.9, 0.1]),
+            Vertex::new([ 0.5, -0.5, -0.5], [0., 0.]),
+            Vertex::new([ 0.5,  0.5, -0.5], [1., 0.]),
+            Vertex::new([ 0.5,  0.5,  0.5], [1., 1.]),
+            Vertex::new([ 0.5, -0.5,  0.5], [0., 1.]),
             // left (-0.5, 0, 0)
-            Vertex::new([-0.5, -0.5,  0.5], [0.8, 0.1, 0.9]),
-            Vertex::new([-0.5,  0.5,  0.5], [0.8, 0.1, 0.9]),
-            Vertex::new([-0.5,  0.5, -0.5], [0.8, 0.1, 0.9]),
-            Vertex::new([-0.5, -0.5, -0.5], [0.8, 0.1, 0.9]),
+            Vertex::new([-0.5, -0.5,  0.5], [1., 0.]),
+            Vertex::new([-0.5,  0.5,  0.5], [0., 0.]),
+            Vertex::new([-0.5,  0.5, -0.5], [0., 1.]),
+            Vertex::new([-0.5, -0.5, -0.5], [1., 1.]),
             // front (0, 0.5, 0)
-            Vertex::new([ 0.5,  0.5, -0.5], [0.2, 0.1, 0.9]),
-            Vertex::new([-0.5,  0.5, -0.5], [0.2, 0.1, 0.9]),
-            Vertex::new([-0.5,  0.5,  0.5], [0.2, 0.1, 0.9]),
-            Vertex::new([ 0.5,  0.5,  0.5], [0.2, 0.1, 0.9]),
+            Vertex::new([ 0.5,  0.5, -0.5], [1., 0.]),
+            Vertex::new([-0.5,  0.5, -0.5], [0., 0.]),
+            Vertex::new([-0.5,  0.5,  0.5], [0., 1.]),
+            Vertex::new([ 0.5,  0.5,  0.5], [1., 1.]),
             // back (0, -0.5, 0)
-            Vertex::new([ 0.5, -0.5,  0.5], [0.8, 0.9, 0.1]),
-            Vertex::new([-0.5, -0.5,  0.5], [0.8, 0.9, 0.1]),
-            Vertex::new([-0.5, -0.5, -0.5], [0.8, 0.9, 0.1]),
-            Vertex::new([ 0.5, -0.5, -0.5], [0.8, 0.9, 0.1]),
+            Vertex::new([ 0.5, -0.5,  0.5], [0., 0.]),
+            Vertex::new([-0.5, -0.5,  0.5], [1., 0.]),
+            Vertex::new([-0.5, -0.5, -0.5], [1., 1.]),
+            Vertex::new([ 0.5, -0.5, -0.5], [0., 1.]),
         ];
 
         let index_data: &[u16] = &[
@@ -63,9 +66,25 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             .create_vertex_buffer_with_slice(vertex_data, index_data);
         let pso = primus_polygoni::create_pipeline(factory, backend);
 
+        let size = 256;
+        let mut texels: Vec<_> = (0..(size * size)).map(|_| [0xFF, 0xFF, 0xFF, 0xFF])
+            .collect();
+        primus_polygoni::generate_texture(&mut texels, size);
+
+        let (_, texture_view) =
+            factory.create_texture_immutable::<gfx::format::Rgba8>(
+                gfx::texture::Kind::D2(size as gfx::texture::Size, size as gfx::texture::Size, gfx::texture::AaMode::Single),
+                &[&texels]
+            ).unwrap();
+        
+        let sinfo = gfx::texture::SamplerInfo::new(
+            gfx::texture::FilterMethod::Bilinear,
+            gfx::texture::WrapMode::Clamp);
+
         let data = primus_polygoni::pipe::Data {
             vertices: vertices,
             locals: factory.create_constant_buffer(1),
+            color: (texture_view, factory.create_sampler(sinfo)),
             color_target: targets.color,
             depth_target: targets.depth,
         };
@@ -74,10 +93,19 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             bundle: gfx::Bundle::new(slice, pso, data),
             camera: Camera::new(),
             aspect_ratio: targets.aspect_ratio,
+            mouse: Vector2::new(0., 0.),
+            head_spinning: false,
         }
     }
 
     fn render<C: gfx::CommandBuffer<R>>(&mut self, encoder: &mut gfx::Encoder<R, C>) {
+        if self.head_spinning {
+            self.camera.rotate(UnitQuaternion::new(
+                Vector3::y() * (-self.mouse.x / 10.0)
+            ));
+            self.camera.pitch(-self.mouse.y / 10.0);
+        }
+
         self.camera.update(self.aspect_ratio);
         let locals = Locals { 
             transform: self.camera.gpu_transform()
@@ -98,6 +126,7 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
     fn on(&mut self, event: winit::Event) {
         use winit::Event::*;
         use winit::ElementState::*;
+        use winit::MouseButton::*;
         match event {
             KeyboardInput(Pressed, _, Some(key)) => {
                 use winit::VirtualKeyCode::*;
@@ -120,20 +149,14 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
                 }
             },
             MouseMoved(x, y) => {
-                // let (w, h) = window.get_inner_size_pixels();
                 let (w, h, _, _) = self.bundle.data.color_target.get_dimensions();
-                let dx = (x as f32 / w as f32) - 0.5;
-                let dy = (y as f32 / h as f32) - 0.5;
-                self.camera.yaw(-dx / 60.0);
-                self.camera.pitch(-dy / 60.0);
-                // window.set_cursor_position(w / 2, h / 2)
+                self.mouse = Vector2::new((x as f32 / w as f32) - 0.5,
+                                          (y as f32 / h as f32) - 0.5);
             }
             MouseWheel(_delta, _) => {
                 
             }
-            MouseInput(_state, _button) => {
-                
-            }
+            MouseInput(state, Left) => self.head_spinning = state == Pressed,
             _ => {}
         }
     }
