@@ -9,9 +9,11 @@ extern crate noise;
 
 mod camera;
 mod texture;
+mod icosphere;
 
 pub use camera::Camera;
 pub use texture::generate as generate_texture;
+pub use icosphere::generate as generate_icosphere;
 pub use gfx_app::{ColorFormat, DepthFormat};
 
 gfx_defines! {
