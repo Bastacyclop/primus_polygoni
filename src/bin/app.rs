@@ -1,8 +1,13 @@
 extern crate primus_polygoni;
+extern crate image;
+extern crate time;
+
+use std::f32::consts::PI;
 use primus_polygoni::gfx;
 use primus_polygoni::gfx_app;
 use primus_polygoni::winit;
 use primus_polygoni::nalgebra::{Vector2, Vector3, UnitQuaternion};
+use time::precise_time_s;
 
 use primus_polygoni::{Vertex, Locals, Camera};
 
@@ -12,6 +17,7 @@ struct App<R: gfx::Resources> {
     aspect_ratio: f32,
     mouse: Vector2<f32>,
     head_spinning: bool,
+    marker: f32,
 }
 
 impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
@@ -26,15 +32,15 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             .create_vertex_buffer_with_slice(&vertex_data[..], &index_data[..]);
         let pso = primus_polygoni::create_pipeline(factory, backend);
 
-        let size = 256;
-        let mut texels: Vec<_> = (0..(size * size)).map(|_| [0xFF, 0xFF, 0xFF, 0xFF])
-            .collect();
+        let size = 1024;
+        let (w, h) = (size * 2, size);
+        let mut texels: Vec<_> = (0..(w * h)).map(|_| [0; 4]).collect();
         primus_polygoni::generate_texture(&mut texels, size);
 
         let (_, texture_view) =
             factory.create_texture_immutable::<gfx::format::Rgba8>(
-                gfx::texture::Kind::D2(size as gfx::texture::Size, 
-                                       size as gfx::texture::Size, 
+                gfx::texture::Kind::D2(w as gfx::texture::Size, 
+                                       h as gfx::texture::Size, 
                                        gfx::texture::AaMode::Single),
                 &[&texels]
             ).unwrap();
@@ -57,15 +63,21 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             aspect_ratio: targets.aspect_ratio,
             mouse: Vector2::new(0., 0.),
             head_spinning: false,
+            marker: precise_time_s() as f32,
         }
     }
 
     fn render<C: gfx::CommandBuffer<R>>(&mut self, encoder: &mut gfx::Encoder<R, C>) {
+        let now = precise_time_s() as f32;
+        let delta = now - self.marker;
+        self.marker = now;
+
         if self.head_spinning {
+            let max_rotation = 2.0 * PI * delta;
             self.camera.rotate(UnitQuaternion::new(
-                Vector3::y() * (-self.mouse.x / 10.0)
+                Vector3::y() * (-self.mouse.x * max_rotation)
             ));
-            self.camera.pitch(-self.mouse.y / 10.0);
+            self.camera.pitch(self.mouse.y * max_rotation);
         }
 
         self.camera.update(self.aspect_ratio);
@@ -113,7 +125,7 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             MouseMoved(x, y) => {
                 let (w, h, _, _) = self.bundle.data.color_target.get_dimensions();
                 self.mouse = Vector2::new((x as f32 / w as f32) - 0.5,
-                                          (y as f32 / h as f32) - 0.5);
+                                          0.5 - (y as f32 / h as f32));
             }
             MouseWheel(_delta, _) => {
                 

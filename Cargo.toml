@@ -9,5 +9,7 @@ gfx_app = { git = "git://github.com/gfx-rs/gfx", rev = "606db695be7fee025b6278a7
 winit = "^0.5"
 nalgebra = "^0.11"
 alga = "^0.5"
+time = "^0.1"
 rand = "^0.3"
 noise = "^0.4"
+image = "^0.12"

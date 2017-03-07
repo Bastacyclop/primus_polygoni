@@ -2,30 +2,48 @@ use std::collections::HashMap;
 use std::mem;
 use Vertex;
 
+fn vertex(pos: [f32; 3]) -> Vertex {
+    use std::f32::consts::{PI};
+
+    let u = pos[0].atan2(pos[2]) / (-2.0 * PI);
+    let u = if u < 0. { u + 1. } else { u };
+    let v = pos[1].asin() / PI + 0.5;
+
+    Vertex::new(pos, [u, v])
+}
+
 pub fn generate(recursion: u16) -> (Vec<Vertex>, Vec<u16>) {
+    let face_count = 20 * 4usize.pow(recursion as u32);
+    let edge_count = 3 * face_count / 2;
+    // Euler's formula
+    let vertex_count = 2 + edge_count - face_count;
+    let index_count = face_count * 3;
+
     let t = (1.0 + 5.0_f32.sqrt()) / 2.0;
     let n = (1. +  t * t).sqrt();
     let u = 1. / n;
     let v = t / n;
 
-    let mut vertex_data = vec![
-        Vertex::new([-u, v, 0.0], [1.0, 0.0]),
-        Vertex::new([ u, v, 0.0], [0.2, 0.0]),
-        Vertex::new([-u, -v, 0.0], [1.0, 0.1]),
-        Vertex::new([ u, -v, 0.0], [0.4, 1.0]),
+    let mut vertex_data = Vec::with_capacity(vertex_count);
+    vertex_data.extend_from_slice(&[
+        vertex([-u, v, 0.0]),
+        vertex([ u, v, 0.0]),
+        vertex([ -u, -v, 0.0]),
+        vertex([ u, -v, 0.0]),
 
-        Vertex::new([0.0, -u, v], [1.0, 0.5]),
-        Vertex::new([0.0,  u, v], [1.0, 0.8]),
-        Vertex::new([0.0, -u, -v], [0.3, 0.0]),
-        Vertex::new([0.0,  u, -v], [1.0, 1.0]),
+        vertex([ 0.0, -u, v]),
+        vertex([ 0.0, u, v]),
+        vertex([ 0.0, -u, -v]),
+        vertex([ 0.0, u, -v]),
 
-        Vertex::new([v, 0.0, -u], [0.5, 0.0]),
-        Vertex::new([v, 0.0,  u], [0.0, 0.9]),
-        Vertex::new([-v, 0.0, -u], [0.0, 1.0]),
-        Vertex::new([-v, 0.0,  u], [1.0, 0.5]),
-    ];
+        vertex([ v, 0.0, -u]),
+        vertex([ v, 0.0, u]),
+        vertex([ -v, 0.0, -u]),
+        vertex([ -v, 0.0, u]),
+    ]);
 
-    let mut index_data: Vec<u16> = vec![
+    let mut index_data: Vec<u16> = Vec::with_capacity(index_count);
+    index_data.extend_from_slice(&[
         // 5 faces around point 0
         0, 11, 5,
         0, 5, 1,
@@ -53,10 +71,10 @@ pub fn generate(recursion: u16) -> (Vec<Vertex>, Vec<u16>) {
         6, 2, 10,
         8, 6, 7,
         9, 8, 1,
-    ];
+    ]);
 
     let mut cache = HashMap::new();
-    let mut next_indices = Vec::with_capacity(index_data.len());
+    let mut next_indices = Vec::with_capacity(index_count);
 
     {
         let mut middle = |ia, ib| {
@@ -75,8 +93,8 @@ pub fn generate(recursion: u16) -> (Vec<Vertex>, Vec<u16>) {
                             middle[2] * middle[2]).sqrt();
                 
                 let index = vertex_data.len() as u16;
-                vertex_data.push(Vertex::new(
-                    [middle[0]/norm, middle[1]/norm, middle[2]/norm], [0.0, 0.0]));
+                let v = vertex([middle[0]/norm, middle[1]/norm, middle[2]/norm]);
+                vertex_data.push(v);
 
                 cache.insert(key, index);
                 index
@@ -105,5 +123,7 @@ pub fn generate(recursion: u16) -> (Vec<Vertex>, Vec<u16>) {
         }
     }
 
+    debug_assert!(vertex_data.len() == vertex_count);
+    debug_assert!(index_data.len() == index_count);
     (vertex_data, index_data)
 }
