@@ -11,12 +11,17 @@ use time::precise_time_s;
 
 use primus_polygoni::{Vertex, Locals, Camera};
 
+const SCENE_SPHERES: f32 = 1.0;
+const SCENE_RADIUS: f32 = 3.0;
+
 struct App<R: gfx::Resources> {
     bundle: gfx::Bundle<R, primus_polygoni::pipe::Data<R>>,
     camera: Camera,
     aspect_ratio: f32,
     mouse: Vector2<f32>,
     head_spinning: bool,
+    going_left: bool,
+    going_right: bool,
     marker: f32,
 }
 
@@ -59,10 +64,12 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
 
         App {
             bundle: gfx::Bundle::new(slice, pso, data),
-            camera: Camera::new(),
+            camera: Camera::new(SCENE_RADIUS),
             aspect_ratio: targets.aspect_ratio,
             mouse: Vector2::new(0., 0.),
             head_spinning: false,
+            going_left: false,
+            going_right: false,
             marker: precise_time_s() as f32,
         }
     }
@@ -79,6 +86,10 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             ));
             self.camera.pitch(self.mouse.y * max_rotation);
         }
+        
+        let speed = (2.0 * PI) / SCENE_SPHERES;
+        if self.going_left { self.camera.move_left(speed * delta); }
+        if self.going_right { self.camera.move_right(speed * delta); }
 
         self.camera.update(self.aspect_ratio);
         let locals = Locals { 
@@ -102,23 +113,11 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
         use winit::ElementState::*;
         use winit::MouseButton::*;
         match event {
-            KeyboardInput(Pressed, _, Some(key)) => {
+            KeyboardInput(state, _, Some(key)) => {
                 use winit::VirtualKeyCode::*;
-                let move_step = 0.05;
-                let angle_step = 0.314;
                 match key {
-                    Left => self.camera.move_right(-move_step),
-                    Right => self.camera.move_right(move_step),
-                    Down => self.camera.move_ahead(-move_step),
-                    Up => self.camera.move_ahead(move_step),
-                    PageDown => self.camera.move_up(-move_step),
-                    PageUp => self.camera.move_up(move_step),
-                    Z => self.camera.pitch(angle_step),
-                    S => self.camera.pitch(-angle_step),
-                    Q => self.camera.yaw(angle_step),
-                    D => self.camera.yaw(-angle_step),
-                    A => self.camera.roll(angle_step),
-                    E => self.camera.roll(-angle_step),
+                    Q | Left => self.going_left = state == Pressed,
+                    D | Right => self.going_right = state == Pressed,
                     _ => {}
                 }
             },

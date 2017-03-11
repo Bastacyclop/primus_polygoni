@@ -13,13 +13,15 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn new() -> Camera {
-        Camera {
-            position: Point3::new(0., 0., -2.),
-            orientation: nalgebra::one(),
+    pub fn new(scene_radius: f32) -> Camera {
+        use std::f32::consts::FRAC_PI_4;
 
-            near: 0.1,
-            far: 10.,
+        Camera {
+            position: Point3::new(0., scene_radius * 0.5, scene_radius * -1.25),
+            orientation: UnitQuaternion::new(Vector3::x() * 3.0 * FRAC_PI_4),
+
+            near: 0.01,
+            far: scene_radius * 2.5,
             fov: (70f32).to_radians(),
 
             transform: nalgebra::one(),
@@ -70,16 +72,16 @@ impl Camera {
         self.rotate(UnitQuaternion::new(axis * angle));
     }
 
-    pub fn move_right(&mut self, d: f32) {
-        self.position += self.orientation * Vector3::x() * -d;
+    pub fn move_left(&mut self, angle: f32) {
+        let r = UnitQuaternion::new(-Vector3::y() * angle);
+        self.position = r * self.position;
+        self.orientation = r * self.orientation;
     }
 
-    pub fn move_up(&mut self, d: f32) {
-        self.position += self.orientation * Vector3::y() * d;
-    }
-
-    pub fn move_ahead(&mut self, d: f32) {
-        self.position += self.ahead() * d;
+    pub fn move_right(&mut self, angle: f32) {
+        let r = UnitQuaternion::new(Vector3::y() * angle);
+        self.position = r * self.position;
+        self.orientation = r * self.orientation;
     }
 
     pub fn ahead(&self) -> Vector3<f32> {
