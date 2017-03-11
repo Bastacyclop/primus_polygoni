@@ -1,6 +1,6 @@
 #version 150 core
 
-in vec3 v_TexCoord;
+in vec2 v_TexCoord;
 
 out vec4 Target0;
 

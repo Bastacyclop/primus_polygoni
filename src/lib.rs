@@ -4,7 +4,7 @@ pub extern crate gfx_app;
 pub extern crate winit;
 pub extern crate alga;
 pub extern crate nalgebra;
-extern crate rand;
+pub extern crate rand;
 extern crate noise;
 
 mod camera;
@@ -22,12 +22,20 @@ gfx_defines! {
         tex_coord: [f32; 2] = "a_TexCoord",
     }
 
+    vertex Instance {
+        t1: [f32; 4] = "a_T1",
+        t2: [f32; 4] = "a_T2",
+        t3: [f32; 4] = "a_T3",
+        t4: [f32; 4] = "a_T4",
+    }
+
     constant Locals {
         transform: [[f32; 4]; 4] = "u_Transform",
     }
 
     pipeline pipe {
         vertices: gfx::VertexBuffer<Vertex> = (),
+        instances: gfx::InstanceBuffer<Instance> = (),
         locals: gfx::ConstantBuffer<Locals> = "Locals",
         color: gfx::TextureSampler<[f32; 4]> = "t_Color",
         color_target: gfx::RenderTarget<ColorFormat> = "Target0",

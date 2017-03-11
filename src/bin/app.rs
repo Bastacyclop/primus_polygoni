@@ -3,16 +3,17 @@ extern crate image;
 extern crate time;
 
 use std::f32::consts::PI;
+use primus_polygoni::rand::{self, Rng};
 use primus_polygoni::gfx;
 use primus_polygoni::gfx_app;
 use primus_polygoni::winit;
-use primus_polygoni::nalgebra::{Vector2, Vector3, UnitQuaternion};
+use primus_polygoni::nalgebra::{self, Vector2, Vector3, UnitQuaternion};
 use time::precise_time_s;
 
-use primus_polygoni::{Vertex, Locals, Camera};
+use primus_polygoni::{Vertex, Instance, Locals, Camera};
 
-const SCENE_SPHERES: f32 = 1.0;
-const SCENE_RADIUS: f32 = 3.0;
+const SCENE_SPHERES: usize = 20;
+const SCENE_RADIUS: f32 = (SCENE_SPHERES as f32 * 3.0) / (2.0 * PI);
 
 struct App<R: gfx::Resources> {
     bundle: gfx::Bundle<R, primus_polygoni::pipe::Data<R>>,
@@ -23,6 +24,41 @@ struct App<R: gfx::Resources> {
     going_left: bool,
     going_right: bool,
     marker: f32,
+    init: bool,
+}
+
+fn fill_instances<R, C>(encoder: &mut gfx::Encoder<R, C>, 
+                        instances: &gfx::handle::Buffer<R, Instance>)
+    where R: gfx::Resources, C: gfx::CommandBuffer<R> 
+{
+    let mut vec = Vec::with_capacity(SCENE_SPHERES);
+    let mut rng = rand::thread_rng();
+
+    for i in 0..SCENE_SPHERES {
+        let angle = i as f32 / SCENE_SPHERES as f32 * (2.0 * PI);
+        let position = Vector3::new(
+            angle.cos() * SCENE_RADIUS,
+            0.0,
+            angle.sin() * SCENE_RADIUS);
+
+        let scale = 1.0;
+
+        let transform = nalgebra::Similarity3::from_parts(
+            nalgebra::Translation3::from_vector(position),
+            nalgebra::one(),
+            scale).to_homogeneous();
+        let transform = transform.as_slice();
+
+        let line = |l: &[f32]| [l[0], l[1], l[2], l[3]]; 
+
+        vec.push(Instance {
+            t1: line(&transform[0..4]),
+            t2: line(&transform[4..8]),
+            t3: line(&transform[8..12]),
+            t4: line(&transform[12..16]),
+        });
+    }
+    encoder.update_buffer(instances, &vec[..], 0).unwrap();
 }
 
 impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
@@ -31,11 +67,12 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
                                targets: gfx_app::WindowTargets<R>) -> Self {
         use gfx::traits::FactoryExt;
 
-        let (vertex_data, index_data) = primus_polygoni::generate_icosphere(4);
-
-        let (vertices, slice) = factory
-            .create_vertex_buffer_with_slice(&vertex_data[..], &index_data[..]);
         let pso = primus_polygoni::create_pipeline(factory, backend);
+
+        let (vertex_data, index_data) = primus_polygoni::generate_icosphere(4);
+        let (vertices, mut slice) = factory
+            .create_vertex_buffer_with_slice(&vertex_data[..], &index_data[..]);
+        slice.instances = Some((SCENE_SPHERES as u32, 0));
 
         let size = 1024;
         let (w, h) = (size * 2, size);
@@ -56,6 +93,8 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
 
         let data = primus_polygoni::pipe::Data {
             vertices: vertices,
+            instances: factory.create_buffer(SCENE_SPHERES, gfx::buffer::Role::Vertex,
+                                             gfx::memory::Usage::Dynamic, gfx::Bind::empty()).unwrap(),
             locals: factory.create_constant_buffer(1),
             color: (texture_view, factory.create_sampler(sinfo)),
             color_target: targets.color,
@@ -71,13 +110,20 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             going_left: false,
             going_right: false,
             marker: precise_time_s() as f32,
+            init: false,
         }
     }
 
     fn render<C: gfx::CommandBuffer<R>>(&mut self, encoder: &mut gfx::Encoder<R, C>) {
+        
         let now = precise_time_s() as f32;
         let delta = now - self.marker;
         self.marker = now;
+
+        if !self.init {
+            fill_instances(encoder, &self.bundle.data.instances);
+            self.init = true;
+        }
 
         if self.head_spinning {
             let max_rotation = 2.0 * PI * delta;
@@ -87,7 +133,7 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             self.camera.pitch(self.mouse.y * max_rotation);
         }
         
-        let speed = (2.0 * PI) / SCENE_SPHERES;
+        let speed = (2.0 * PI) / SCENE_SPHERES as f32;
         if self.going_left { self.camera.move_left(speed * delta); }
         if self.going_right { self.camera.move_right(speed * delta); }
 
@@ -136,6 +182,6 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
 }
 
 fn main() {
-    use gfx_app::Application;
-    App::launch_simple("Primus Polygoni");
+    let wb = winit::WindowBuilder::new().with_title("Primus Polygoni");
+    gfx_app::launch_gl3::<gfx_app::Wrap<_,_,App<_>>>(wb);
 }

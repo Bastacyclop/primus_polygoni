@@ -14,11 +14,12 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(scene_radius: f32) -> Camera {
-        use std::f32::consts::FRAC_PI_4;
+        let p = Point3::new(0., scene_radius * 0.2, scene_radius * -1.25);
+        let c = Point3::new(0., 0., scene_radius * -1.0);
 
         Camera {
-            position: Point3::new(0., scene_radius * 0.5, scene_radius * -1.25),
-            orientation: UnitQuaternion::new(Vector3::x() * 3.0 * FRAC_PI_4),
+            position: p,
+            orientation: UnitQuaternion::rotation_between(&Vector3::z(), &(c - p)).unwrap(),
 
             near: 0.01,
             far: scene_radius * 2.5,
