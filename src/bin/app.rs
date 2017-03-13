@@ -3,7 +3,9 @@ extern crate image;
 extern crate time;
 
 use std::f32::consts::PI;
-use primus_polygoni::rand::{self, Rng};
+use primus_polygoni::rand;
+use primus_polygoni::rand::distributions::{IndependentSample, Range};
+
 use primus_polygoni::gfx;
 use primus_polygoni::gfx_app;
 use primus_polygoni::winit;
@@ -12,8 +14,8 @@ use time::precise_time_s;
 
 use primus_polygoni::{Vertex, Instance, Locals, Camera};
 
-const SCENE_SPHERES: usize = 20;
-const SCENE_RADIUS: f32 = (SCENE_SPHERES as f32 * 3.0) / (2.0 * PI);
+const SCENE_SPHERES: usize = 100;
+const SCENE_RADIUS: f32 = (SCENE_SPHERES as f32 * 4.0) / (2.0 * PI);
 
 struct App<R: gfx::Resources> {
     bundle: gfx::Bundle<R, primus_polygoni::pipe::Data<R>>,
@@ -41,12 +43,20 @@ fn fill_instances<R, C>(encoder: &mut gfx::Encoder<R, C>,
             0.0,
             angle.sin() * SCENE_RADIUS);
 
-        let scale = 1.0;
+        let radius = Range::new(0.5, 1.5).ind_sample(&mut rng);
+        let remaining = 2.0 - radius;
+
+        let range = Range::new(-remaining, remaining);
+        let displacement = Vector3::new(
+            range.ind_sample(&mut rng),
+            range.ind_sample(&mut rng),
+            range.ind_sample(&mut rng),
+        );
 
         let transform = nalgebra::Similarity3::from_parts(
-            nalgebra::Translation3::from_vector(position),
+            nalgebra::Translation3::from_vector(position + displacement),
             nalgebra::one(),
-            scale).to_homogeneous();
+            radius).to_homogeneous();
         let transform = transform.as_slice();
 
         let line = |l: &[f32]| [l[0], l[1], l[2], l[3]]; 
@@ -133,7 +143,7 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             self.camera.pitch(self.mouse.y * max_rotation);
         }
         
-        let speed = (2.0 * PI) / SCENE_SPHERES as f32;
+        let speed = 0.5 * PI;
         if self.going_left { self.camera.move_left(speed * delta); }
         if self.going_right { self.camera.move_right(speed * delta); }
 
