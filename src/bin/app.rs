@@ -1,33 +1,22 @@
 extern crate primus_polygoni;
+extern crate gfx_window_glutin;
+extern crate glutin;
 extern crate image;
 extern crate time;
 
 use std::f32::consts::PI;
 use primus_polygoni::rand;
 use primus_polygoni::rand::distributions::{IndependentSample, Range};
-
 use primus_polygoni::gfx;
-use primus_polygoni::gfx_app;
-use primus_polygoni::winit;
 use primus_polygoni::nalgebra::{self, Vector2, Vector3, UnitQuaternion};
 use time::precise_time_s;
 
-use primus_polygoni::{Vertex, Instance, Locals, Camera};
+use primus_polygoni::{Vertex, Instance, Locals, Camera, ColorFormat, DepthFormat};
+use gfx::traits::FactoryExt;
+use gfx::{Factory, Device};
 
 const SCENE_SPHERES: usize = 100;
 const SCENE_RADIUS: f32 = (SCENE_SPHERES as f32 * 4.0) / (2.0 * PI);
-
-struct App<R: gfx::Resources> {
-    bundle: gfx::Bundle<R, primus_polygoni::pipe::Data<R>>,
-    camera: Camera,
-    aspect_ratio: f32,
-    mouse: Vector2<f32>,
-    head_spinning: bool,
-    going_left: bool,
-    going_right: bool,
-    marker: f32,
-    init: bool,
-}
 
 fn fill_instances<R, C>(encoder: &mut gfx::Encoder<R, C>, 
                         instances: &gfx::handle::Buffer<R, Instance>)
@@ -71,127 +60,123 @@ fn fill_instances<R, C>(encoder: &mut gfx::Encoder<R, C>,
     encoder.update_buffer(instances, &vec[..], 0).unwrap();
 }
 
-impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
-    fn new<F: gfx::Factory<R>>(factory: &mut F,
-                               backend: gfx_app::shade::Backend,
-                               targets: gfx_app::WindowTargets<R>) -> Self {
-        use gfx::traits::FactoryExt;
+fn main() {
+    let gl_version = glutin::GlRequest::GlThenGles {
+        opengl_version: (3, 2),
+        opengles_version: (2, 0)
+    };
+    let wb = glutin::WindowBuilder::new()
+        .with_gl(gl_version)
+        .with_title("Primus Polygoni");
+    let (window, mut device, mut factory, main_color, main_depth) =
+        gfx_window_glutin::init::<ColorFormat, DepthFormat>(wb);
+    let (width, height) = window.get_inner_size_points().unwrap();
+    let mut aspect_ratio = width as f32 / height as f32;
 
-        let pso = primus_polygoni::create_pipeline(factory, backend);
+    let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
+    let pso = primus_polygoni::create_pipeline(&mut factory);
 
-        let (vertex_data, index_data) = primus_polygoni::generate_icosphere(4);
-        let (vertices, mut slice) = factory
-            .create_vertex_buffer_with_slice(&vertex_data[..], &index_data[..]);
-        slice.instances = Some((SCENE_SPHERES as u32, 0));
+    let (vertex_data, index_data) = primus_polygoni::generate_icosphere(4);
+    let (vertices, mut slice) = factory
+        .create_vertex_buffer_with_slice(&vertex_data[..], &index_data[..]);
+    slice.instances = Some((SCENE_SPHERES as u32, 0));
 
-        let size = 1024;
-        let (w, h) = (size * 2, size);
-        let mut texels: Vec<_> = (0..(w * h)).map(|_| [0; 4]).collect();
-        primus_polygoni::generate_texture(&mut texels, size);
+    let instances = factory.create_buffer(SCENE_SPHERES,
+                                          gfx::buffer::Role::Vertex,
+                                          gfx::memory::Usage::Dynamic,
+                                          gfx::Bind::empty()).unwrap();
+    fill_instances(&mut encoder, &instances);
 
-        let (_, texture_view) =
-            factory.create_texture_immutable::<gfx::format::Rgba8>(
-                gfx::texture::Kind::D2(w as gfx::texture::Size, 
-                                       h as gfx::texture::Size, 
-                                       gfx::texture::AaMode::Single),
-                &[&texels]
-            ).unwrap();
-        
-        let sinfo = gfx::texture::SamplerInfo::new(
-            gfx::texture::FilterMethod::Bilinear,
-            gfx::texture::WrapMode::Clamp);
+    let size = 1024;
+    let (w, h) = (size * 2, size);
+    let mut texels: Vec<_> = (0..(w * h)).map(|_| [0; 4]).collect();
+    primus_polygoni::generate_texture(&mut texels, size);
 
-        let data = primus_polygoni::pipe::Data {
-            vertices: vertices,
-            instances: factory.create_buffer(SCENE_SPHERES, gfx::buffer::Role::Vertex,
-                                             gfx::memory::Usage::Dynamic, gfx::Bind::empty()).unwrap(),
-            locals: factory.create_constant_buffer(1),
-            color: (texture_view, factory.create_sampler(sinfo)),
-            color_target: targets.color,
-            depth_target: targets.depth,
-        };
+    let (_, texture_view) =
+        factory.create_texture_immutable::<gfx::format::Rgba8>(
+            gfx::texture::Kind::D2(w as gfx::texture::Size,
+                                   h as gfx::texture::Size,
+                                   gfx::texture::AaMode::Single),
+            &[&texels]
+        ).unwrap();
 
-        App {
-            bundle: gfx::Bundle::new(slice, pso, data),
-            camera: Camera::new(SCENE_RADIUS),
-            aspect_ratio: targets.aspect_ratio,
-            mouse: Vector2::new(0., 0.),
-            head_spinning: false,
-            going_left: false,
-            going_right: false,
-            marker: precise_time_s() as f32,
-            init: false,
+    let sinfo = gfx::texture::SamplerInfo::new(
+        gfx::texture::FilterMethod::Bilinear,
+        gfx::texture::WrapMode::Clamp);
+
+    let mut data = primus_polygoni::pipe::Data {
+        vertices: vertices,
+        instances: instances,
+        locals: factory.create_constant_buffer(1),
+        color: (texture_view, factory.create_sampler(sinfo)),
+        color_target: main_color,
+        depth_target: main_depth,
+    };
+
+    let mut camera = Camera::new(SCENE_RADIUS);
+
+    let mut mouse = Vector2::new(0., 0.);
+    let mut head_spinning = false;
+    let mut going_left = false;
+    let mut going_right = false;
+
+    let mut marker = precise_time_s() as f32;
+    'main: loop {
+        for event in window.poll_events() {
+            use glutin::Event::*;
+            use glutin::ElementState::*;
+            use glutin::MouseButton::*;
+            match event {
+                Closed => break 'main,
+                Resized(w, h) => {
+                    aspect_ratio = w as f32 / h as f32;
+                    gfx_window_glutin::update_views(
+                        &window, &mut data.color_target, &mut data.depth_target);
+                }
+                KeyboardInput(state, _, Some(key)) => {
+                    use glutin::VirtualKeyCode::*;
+                    match key {
+                        Q | Left => going_left = state == Pressed,
+                        D | Right => going_right = state == Pressed,
+                        _ => {}
+                    }
+                },
+                MouseMoved(x, y) => {
+                    let (w, h, _, _) = data.color_target.get_dimensions();
+                    mouse = Vector2::new((x as f32 / w as f32) - 0.5,
+                                         0.5 - (y as f32 / h as f32));
+                }
+                MouseInput(state, Left) => head_spinning = state == Pressed,
+                _ => {}
+            }
         }
-    }
 
-    fn render<C: gfx::CommandBuffer<R>>(&mut self, encoder: &mut gfx::Encoder<R, C>) {
-        
         let now = precise_time_s() as f32;
-        let delta = now - self.marker;
-        self.marker = now;
+        let delta = now - marker;
+        marker = now;
 
-        if !self.init {
-            fill_instances(encoder, &self.bundle.data.instances);
-            self.init = true;
-        }
-
-        if self.head_spinning {
+        if head_spinning {
             let max_rotation = 2.0 * PI * delta;
-            self.camera.rotate(UnitQuaternion::new(
-                Vector3::y() * (-self.mouse.x * max_rotation)
+            camera.rotate(UnitQuaternion::new(
+                Vector3::y() * (-mouse.x * max_rotation)
             ));
-            self.camera.pitch(self.mouse.y * max_rotation);
+            camera.pitch(mouse.y * max_rotation);
         }
         
         let speed = 0.5 * PI;
-        if self.going_left { self.camera.move_left(speed * delta); }
-        if self.going_right { self.camera.move_right(speed * delta); }
+        if going_left { camera.move_left(speed * delta); }
+        if going_right { camera.move_right(speed * delta); }
 
-        self.camera.update(self.aspect_ratio);
-        let locals = Locals { 
-            transform: self.camera.gpu_transform()
-        };
-        encoder.update_constant_buffer(&self.bundle.data.locals, &locals);
+        camera.update(aspect_ratio);
+        encoder.update_constant_buffer(&data.locals, &Locals {
+            transform: camera.gpu_transform()
+        });
 
-        encoder.clear(&self.bundle.data.color_target, [0.1, 0.2, 0.3, 1.0]);
-        encoder.clear_depth(&self.bundle.data.depth_target, 1.0);
-        self.bundle.encode(encoder);
+        encoder.clear(&data.color_target, [0.1, 0.2, 0.3, 1.0]);
+        encoder.clear_depth(&data.depth_target, 1.0);
+        encoder.draw(&slice, &pso, &data);
+        encoder.flush(&mut device);
+        window.swap_buffers().unwrap();
+        device.cleanup();
     }
-
-    fn on_resize(&mut self, targets: gfx_app::WindowTargets<R>) {
-        self.bundle.data.color_target = targets.color;
-        self.bundle.data.depth_target = targets.depth;
-        self.aspect_ratio = targets.aspect_ratio;
-    }
-
-    fn on(&mut self, event: winit::Event) {
-        use winit::Event::*;
-        use winit::ElementState::*;
-        use winit::MouseButton::*;
-        match event {
-            KeyboardInput(state, _, Some(key)) => {
-                use winit::VirtualKeyCode::*;
-                match key {
-                    Q | Left => self.going_left = state == Pressed,
-                    D | Right => self.going_right = state == Pressed,
-                    _ => {}
-                }
-            },
-            MouseMoved(x, y) => {
-                let (w, h, _, _) = self.bundle.data.color_target.get_dimensions();
-                self.mouse = Vector2::new((x as f32 / w as f32) - 0.5,
-                                          0.5 - (y as f32 / h as f32));
-            }
-            MouseWheel(_delta, _) => {
-                
-            }
-            MouseInput(state, Left) => self.head_spinning = state == Pressed,
-            _ => {}
-        }
-    }
-}
-
-fn main() {
-    let wb = winit::WindowBuilder::new().with_title("Primus Polygoni");
-    gfx_app::launch_gl3::<gfx_app::Wrap<_,_,App<_>>>(wb);
 }

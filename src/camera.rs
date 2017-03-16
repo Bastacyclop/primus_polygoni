@@ -14,12 +14,13 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(scene_radius: f32) -> Camera {
-        let p = Point3::new(0., scene_radius * 0.2, scene_radius * -1.25);
-        let c = Point3::new(0., 0., scene_radius * -1.0);
+        let p = Point3::new(0., scene_radius * 0.1, scene_radius * -1.25);
+        let target = Point3::new(0., 0., scene_radius * -0.75);
 
         Camera {
             position: p,
-            orientation: UnitQuaternion::rotation_between(&Vector3::z(), &(c - p)).unwrap(),
+            orientation: UnitQuaternion::rotation_between(
+                &Vector3::z(), &(target - p)).unwrap(),
 
             near: 0.01,
             far: scene_radius * 2.5,
