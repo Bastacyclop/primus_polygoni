@@ -87,18 +87,25 @@ fn main() {
                                           gfx::Bind::empty()).unwrap();
     fill_instances(&mut encoder, &instances);
 
-    let size = 1024;
+    let size = 256;
     let (w, h) = (size * 2, size);
-    let mut texels: Vec<_> = (0..(w * h)).map(|_| [0; 4]).collect();
-    primus_polygoni::generate_texture(&mut texels, size);
+   
+    let mut texels: Vec<_> = (0..(w * h * SCENE_SPHERES)).map(|_| [0; 4]).collect();
+    let mut textures = Vec::with_capacity(SCENE_SPHERES);
+
+    for s in texels.chunks_mut(w *h) {  
+        primus_polygoni::generate_texture(s, size);
+        textures.push(s as &[_]);
+    }
 
     let (_, texture_view) =
         factory.create_texture_immutable::<gfx::format::Rgba8>(
-            gfx::texture::Kind::D2(w as gfx::texture::Size,
-                                   h as gfx::texture::Size,
-                                   gfx::texture::AaMode::Single),
-            &[&texels]
-        ).unwrap();
+            gfx::texture::Kind::D2Array(w as gfx::texture::Size,
+                                        h as gfx::texture::Size,
+                                        SCENE_SPHERES as gfx::texture::Size,
+                                        gfx::texture::AaMode::Single),
+            &textures[..]
+        ).expect("could not create texture");
 
     let sinfo = gfx::texture::SamplerInfo::new(
         gfx::texture::FilterMethod::Bilinear,

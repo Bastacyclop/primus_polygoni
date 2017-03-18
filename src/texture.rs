@@ -1,17 +1,37 @@
 use std::f32;
+use rand::{self, Rng};
 use noise::{
-    NoiseModule, Constant, Checkerboard,
-    Fbm, HybridMulti, RidgedMulti, BasicMulti, Perlin, Worley, Billow
+    NoiseModule, Seedable, MultiFractal, Constant, Perlin, Billow, RidgedMulti
 };
 
 pub fn generate(output: &mut [[u8; 4]], size: usize) {
-    fill(&Billow::new(), &Constant::new(-0.2), &Constant::new(-0.3), output, size);
+    let mut rng = rand::thread_rng();
+
+    let mut gen_noise = || {
+        match rng.gen_range(0, 4) {
+            0 => Box::new(Constant::new(rng.gen_range(0f32, 1f32))) as Box<NoiseModule<[f32; 3], Output=f32>>,
+            1 => Box::new(Perlin::new().set_seed(rng.gen())),
+            2 => Box::new(Billow::new()
+                    .set_seed(rng.gen())
+                    .set_octaves(rng.gen_range(2, 6))
+                    .set_frequency(rng.gen_range(0.8, 1.2))
+                    .set_persistence(rng.gen_range(0.3, 0.8))),
+            _ => Box::new(RidgedMulti::new()
+                    .set_seed(rng.gen())
+                    .set_octaves(rng.gen_range(2, 6))
+                    .set_frequency(rng.gen_range(0.8, 1.2))
+                    .set_persistence(rng.gen_range(0.7, 1.3))
+                    .set_attenuation(rng.gen_range(1.7, 2.3))),
+        } 
+    }; 
+
+    fill(&*gen_noise(), &*gen_noise(), &*gen_noise(), output, size);
 }
 
 fn fill<R, G, B>(r: &R, g: &G, b: &B, output: &mut [[u8; 4]], size: usize)
-    where R: NoiseModule<[f32; 3], Output=f32>,
-          G: NoiseModule<[f32; 3], Output=f32>,
-          B: NoiseModule<[f32; 3], Output=f32>
+    where R: NoiseModule<[f32; 3], Output=f32> + ?Sized,
+          G: NoiseModule<[f32; 3], Output=f32> + ?Sized,
+          B: NoiseModule<[f32; 3], Output=f32> + ?Sized
 {
     debug_assert!(output.len() == 2 * size * size);
     for y in 0..size {
