@@ -14,7 +14,7 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(scene_radius: f32) -> Camera {
-        let p = Point3::new(0., scene_radius * 0.1, scene_radius * -1.25);
+        let p = Point3::new(0., scene_radius * 0.1, scene_radius * -1.25 - 1.5);
         let target = Point3::new(0., 0., scene_radius * -0.75);
 
         Camera {
@@ -23,7 +23,7 @@ impl Camera {
                 &Vector3::z(), &(target - p)).unwrap(),
 
             near: 0.01,
-            far: scene_radius * 2.5,
+            far: scene_radius * 2.5 + 3.,
             fov: (70f32).to_radians(),
 
             transform: nalgebra::one(),

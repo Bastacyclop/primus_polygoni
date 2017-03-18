@@ -4,6 +4,7 @@ extern crate glutin;
 extern crate image;
 extern crate time;
 
+use std::env;
 use std::f32::consts::PI;
 use primus_polygoni::rand;
 use primus_polygoni::rand::distributions::{IndependentSample, Range};
@@ -15,22 +16,23 @@ use primus_polygoni::{Vertex, Instance, Locals, Camera, ColorFormat, DepthFormat
 use gfx::traits::FactoryExt;
 use gfx::{Factory, Device};
 
-const SCENE_SPHERES: usize = 100;
-const SCENE_RADIUS: f32 = (SCENE_SPHERES as f32 * 4.0) / (2.0 * PI);
 
-fn fill_instances<R, C>(encoder: &mut gfx::Encoder<R, C>, 
+
+fn fill_instances<R, C>(sphere_count: usize,
+                        scene_radius: f32,
+                        encoder: &mut gfx::Encoder<R, C>, 
                         instances: &gfx::handle::Buffer<R, Instance>)
     where R: gfx::Resources, C: gfx::CommandBuffer<R> 
 {
-    let mut vec = Vec::with_capacity(SCENE_SPHERES);
+    let mut vec = Vec::with_capacity(sphere_count);
     let mut rng = rand::thread_rng();
 
-    for i in 0..SCENE_SPHERES {
-        let angle = i as f32 / SCENE_SPHERES as f32 * (2.0 * PI);
+    for i in 0..sphere_count {
+        let angle = i as f32 / sphere_count as f32 * (2.0 * PI);
         let position = Vector3::new(
-            angle.cos() * SCENE_RADIUS,
+            angle.cos() * scene_radius,
             0.0,
-            angle.sin() * SCENE_RADIUS);
+            angle.sin() * scene_radius);
 
         let radius = Range::new(0.5, 1.5).ind_sample(&mut rng);
         let remaining = 2.0 - radius;
@@ -61,6 +63,15 @@ fn fill_instances<R, C>(encoder: &mut gfx::Encoder<R, C>,
 }
 
 fn main() {
+    let mut args = env::args().skip(1);
+
+    let sphere_count: usize = args.next()
+        .map(|s| s.parse().expect("expected number of spheres")).unwrap_or(100);
+    let scene_radius: f32 = (sphere_count as f32 * 4.0) / (2.0 * PI);
+
+    let texture_size: usize = args.next()
+        .map(|s| s.parse().expect("expected texture size")).unwrap_or(256);
+
     let gl_version = glutin::GlRequest::GlThenGles {
         opengl_version: (3, 2),
         opengles_version: (2, 0)
@@ -79,22 +90,20 @@ fn main() {
     let (vertex_data, index_data) = primus_polygoni::generate_icosphere(4);
     let (vertices, mut slice) = factory
         .create_vertex_buffer_with_slice(&vertex_data[..], &index_data[..]);
-    slice.instances = Some((SCENE_SPHERES as u32, 0));
+    slice.instances = Some((sphere_count as u32, 0));
 
-    let instances = factory.create_buffer(SCENE_SPHERES,
+    let instances = factory.create_buffer(sphere_count,
                                           gfx::buffer::Role::Vertex,
                                           gfx::memory::Usage::Dynamic,
                                           gfx::Bind::empty()).unwrap();
-    fill_instances(&mut encoder, &instances);
+    fill_instances(sphere_count, scene_radius, &mut encoder, &instances);
 
-    let size = 256;
-    let (w, h) = (size * 2, size);
-   
-    let mut texels: Vec<_> = (0..(w * h * SCENE_SPHERES)).map(|_| [0; 4]).collect();
-    let mut textures = Vec::with_capacity(SCENE_SPHERES);
+    let (w, h) = (texture_size * 2, texture_size);
+    let mut texels: Vec<_> = (0..(w * h * sphere_count)).map(|_| [0; 4]).collect();
+    let mut textures = Vec::with_capacity(sphere_count);
 
     for s in texels.chunks_mut(w *h) {  
-        primus_polygoni::generate_texture(s, size);
+        primus_polygoni::generate_texture(s, texture_size);
         textures.push(s as &[_]);
     }
 
@@ -102,7 +111,7 @@ fn main() {
         factory.create_texture_immutable::<gfx::format::Rgba8>(
             gfx::texture::Kind::D2Array(w as gfx::texture::Size,
                                         h as gfx::texture::Size,
-                                        SCENE_SPHERES as gfx::texture::Size,
+                                        sphere_count as gfx::texture::Size,
                                         gfx::texture::AaMode::Single),
             &textures[..]
         ).expect("could not create texture");
@@ -120,7 +129,7 @@ fn main() {
         depth_target: main_depth,
     };
 
-    let mut camera = Camera::new(SCENE_RADIUS);
+    let mut camera = Camera::new(scene_radius);
 
     let mut mouse = Vector2::new(0., 0.);
     let mut head_spinning = false;
