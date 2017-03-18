@@ -70,3 +70,33 @@ pub fn create_pipeline<R, F>(factory: &mut F)
         pipe::new()
     ).unwrap()
 }
+
+pub struct FpsCounter {
+    accumulator: f32,
+    frames: f32,
+    period: f32,
+}
+
+impl FpsCounter {
+    pub fn new(sample_period: f32) -> Self {
+        FpsCounter {
+            accumulator: 0.,
+            frames: 0.,
+            period: sample_period,
+        }
+    }
+
+    pub fn update(&mut self, delta: f32) -> Option<f32> {
+        self.accumulator += delta;
+        self.frames += 1.;
+
+        if self.accumulator >= self.period {
+            let fps = self.frames / self.accumulator;
+            self.accumulator = 0.;
+            self.frames = 0.;
+            Some(fps)
+        } else {
+            None
+        }
+    }
+}

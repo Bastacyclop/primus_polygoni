@@ -16,8 +16,6 @@ use primus_polygoni::{Vertex, Instance, Locals, Camera, ColorFormat, DepthFormat
 use gfx::traits::FactoryExt;
 use gfx::{Factory, Device};
 
-
-
 fn fill_instances<R, C>(sphere_count: usize,
                         scene_radius: f32,
                         encoder: &mut gfx::Encoder<R, C>, 
@@ -66,7 +64,7 @@ fn main() {
     let mut args = env::args().skip(1);
 
     let sphere_count: usize = args.next()
-        .map(|s| s.parse().expect("expected number of spheres")).unwrap_or(100);
+        .map(|s| s.parse().expect("expected number of spheres")).unwrap_or(64);
     let scene_radius: f32 = (sphere_count as f32 * 4.0) / (2.0 * PI);
 
     let texture_size: usize = args.next()
@@ -137,6 +135,7 @@ fn main() {
     let mut going_right = false;
 
     let mut marker = precise_time_s() as f32;
+    let mut fps_counter = primus_polygoni::FpsCounter::new(1.0);
     'main: loop {
         for event in window.poll_events() {
             use glutin::Event::*;
@@ -169,6 +168,7 @@ fn main() {
 
         let now = precise_time_s() as f32;
         let delta = now - marker;
+        fps_counter.update(delta).map(|fps| println!("{} fps", fps));
         marker = now;
 
         if head_spinning {
