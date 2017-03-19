@@ -60,6 +60,34 @@ fn fill_instances<R, C>(sphere_count: usize,
     encoder.update_buffer(instances, &vec[..], 0).unwrap();
 }
 
+fn generate_textures<R, C>(sphere_count: usize,
+                           texture_size: usize,
+                           encoder: &mut gfx::Encoder<R, C>, 
+                           texture: &gfx::handle::Texture<R, gfx::format::R8_G8_B8_A8>)
+    where R: gfx::Resources, C: gfx::CommandBuffer<R> 
+{
+    println!("Generating textures");
+    let (w, h) = (texture_size * 2, texture_size);
+    let mut texels: Vec<_> = (0..(w * h)).map(|_| [0; 4]).collect();
+    let mut info = gfx::texture::ImageInfoCommon {
+        xoffset: 0,
+        yoffset: 0,
+        zoffset: 0,
+        width: w as gfx::texture::Size,
+        height: h as gfx::texture::Size,
+        depth: 1,
+        format: (),
+        mipmap: 0
+    };
+
+    for i in 0..sphere_count {  
+        primus_polygoni::generate_texture(&mut texels[..], texture_size);
+        info.zoffset = i as gfx::texture::Size;
+        encoder.update_texture::<_, gfx::format::Rgba8>(texture, None, info, &texels[..])
+            .unwrap();
+    }
+}
+
 fn main() {
     let mut args = env::args().skip(1);
 
@@ -97,22 +125,20 @@ fn main() {
     fill_instances(sphere_count, scene_radius, &mut encoder, &instances);
 
     let (w, h) = (texture_size * 2, texture_size);
-    let mut texels: Vec<_> = (0..(w * h * sphere_count)).map(|_| [0; 4]).collect();
-    let mut textures = Vec::with_capacity(sphere_count);
-
-    for s in texels.chunks_mut(w *h) {  
-        primus_polygoni::generate_texture(s, texture_size);
-        textures.push(s as &[_]);
-    }
-
-    let (_, texture_view) =
-        factory.create_texture_immutable::<gfx::format::Rgba8>(
+    let texture =
+        factory.create_texture(
             gfx::texture::Kind::D2Array(w as gfx::texture::Size,
                                         h as gfx::texture::Size,
                                         sphere_count as gfx::texture::Size,
                                         gfx::texture::AaMode::Single),
-            &textures[..]
+            1, 
+            gfx::memory::SHADER_RESOURCE,
+            gfx::memory::Usage::Dynamic,
+            Some(gfx::format::ChannelType::Unorm)
         ).expect("could not create texture");
+    let texture_view = factory
+        .view_texture_as_shader_resource::<gfx::format::Rgba8>(&texture, (0, 0), gfx::format::Swizzle::new())
+        .expect("could not create texture view");
 
     let sinfo = gfx::texture::SamplerInfo::new(
         gfx::texture::FilterMethod::Bilinear,
@@ -133,6 +159,8 @@ fn main() {
     let mut head_spinning = false;
     let mut going_left = false;
     let mut going_right = false;
+    let mut toggled = false;
+    let mut reset = true;
 
     let mut marker = precise_time_s() as f32;
     let mut fps_counter = primus_polygoni::FpsCounter::new(1.0);
@@ -153,6 +181,8 @@ fn main() {
                     match key {
                         Q | Left => going_left = state == Pressed,
                         D | Right => going_right = state == Pressed,
+                        T if state == Released => toggled = !toggled,
+                        R if state == Released => reset = true,
                         _ => {}
                     }
                 },
@@ -182,6 +212,11 @@ fn main() {
         let speed = 0.5 * PI;
         if going_left { camera.move_left(speed * delta); }
         if going_right { camera.move_right(speed * delta); }
+        if toggled { unimplemented!() }
+        if reset { 
+            generate_textures(sphere_count, texture_size, &mut encoder, &texture);    
+            reset = false;
+        }
 
         camera.update(aspect_ratio);
         encoder.update_constant_buffer(&data.locals, &Locals {
