@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::mem;
-use Vertex;
+use scene::Vertex;
 
 fn vertex(pos: [f32; 3]) -> Vertex {
     use std::f32::consts::{PI};

@@ -1,74 +1,142 @@
 #[macro_use]
 pub extern crate gfx;
-pub extern crate winit;
-pub extern crate alga;
-pub extern crate nalgebra;
-pub extern crate rand;
+extern crate gfx_device_gl;
+extern crate gfx_window_glutin;
+extern crate glutin;
+extern crate winit;
+extern crate alga;
+extern crate nalgebra;
+extern crate rand;
 extern crate noise;
+extern crate image;
+extern crate time;
 
+pub mod scene;
 mod camera;
 mod texture;
 mod icosphere;
 
+pub use scene::Scene;
 pub use camera::Camera;
 pub use texture::generate as generate_texture;
 pub use icosphere::generate as generate_icosphere;
-pub type ColorFormat = gfx::format::Rgba8;
-pub type DepthFormat = gfx::format::DepthStencil;
 
-gfx_defines! {
-    vertex Vertex {
-        pos: [f32; 4] = "a_Pos",
-        tex_coord: [f32; 2] = "a_TexCoord",
-    }
+use std::env;
+use std::f32::consts::PI;
+use nalgebra::{Vector2, Vector3, UnitQuaternion};
+use time::precise_time_s;
+use gfx::Device;
+use scene::{ColorFormat, DepthFormat};
 
-    vertex Instance {
-        t1: [f32; 4] = "a_T1",
-        t2: [f32; 4] = "a_T2",
-        t3: [f32; 4] = "a_T3",
-        t4: [f32; 4] = "a_T4",
-    }
-
-    constant Locals {
-        transform: [[f32; 4]; 4] = "u_Transform",
-    }
-
-    pipeline pipe {
-        vertices: gfx::VertexBuffer<Vertex> = (),
-        instances: gfx::InstanceBuffer<Instance> = (),
-        locals: gfx::ConstantBuffer<Locals> = "Locals",
-        color: gfx::TextureSampler<[f32; 4]> = "t_Color",
-        color_target: gfx::RenderTarget<ColorFormat> = "Target0",
-        depth_target: gfx::DepthTarget<DepthFormat> =
-            gfx::preset::depth::LESS_EQUAL_WRITE,
-    }
-}
-
-impl Vertex {
-    pub fn new(pos: [f32; 3], tex_coord: [f32; 2]) -> Vertex {
-        Vertex {
-            pos: [pos[0], pos[1], pos[2], 1.0],
-            tex_coord: tex_coord,
-        }
-    }
-}
-
-pub fn create_pipeline<R, F>(factory: &mut F)
-                             -> gfx::PipelineState<R, pipe::Meta>
-    where R: gfx::Resources, F: gfx::Factory<R>
+pub fn run<I>(title: &str)
+    where I: scene::Impl<gfx_device_gl::Resources>
 {
-    use gfx::traits::FactoryExt;
+    let mut args = env::args().skip(1);
 
-    let program = factory.link_program(
-        include_bytes!("shader/main_150.glslv"),
-        include_bytes!("shader/main_150.glslf")).unwrap();
+    let sphere_count: usize = args.next()
+        .map(|s| s.parse().expect("expected number of spheres")).unwrap_or(64);
+    let texture_size: usize = args.next()
+        .map(|s| s.parse().expect("expected texture size")).unwrap_or(128);
 
-    factory.create_pipeline_from_program(
-        &program,
-        gfx::Primitive::TriangleList,
-        gfx::state::Rasterizer::new_fill(),
-        pipe::new()
-    ).unwrap()
+    let gl_version = glutin::GlRequest::GlThenGles {
+        opengl_version: (3, 2),
+        opengles_version: (2, 0)
+    };
+    let wb = glutin::WindowBuilder::new()
+        .with_gl(gl_version)
+        .with_title(format!("Primus Polygoni -- {}", title));
+    let (window, mut device, mut factory, main_color, main_depth) =
+        gfx_window_glutin::init::<ColorFormat, DepthFormat>(wb);
+    let (width, height) = window.get_inner_size_points().unwrap();
+    let mut aspect_ratio = width as f32 / height as f32;
+
+    let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
+
+    let mut scene = Scene::<_, I>::new(sphere_count,
+                                       texture_size,
+                                       main_color,
+                                       main_depth,
+                                       &mut factory,
+                                       &mut encoder);
+
+    let mut mouse = Vector2::new(0., 0.);
+    let mut head_spinning = false;
+    let mut going_left = false;
+    let mut going_right = false;
+    let mut toggled = false;
+    let mut reset = true;
+    let mut update_marker = None;
+
+    let mut marker = precise_time_s() as f32;
+    let mut fps_counter = FpsCounter::new(1.0);
+    'main: loop {
+        for event in window.poll_events() {
+            use glutin::Event::*;
+            use glutin::ElementState::*;
+            use glutin::MouseButton::*;
+            match event {
+                Closed => break 'main,
+                Resized(w, h) => {
+                    aspect_ratio = w as f32 / h as f32;
+                    gfx_window_glutin::update_views(
+                        &window,
+                        &mut scene.data.color_target,
+                        &mut scene.data.depth_target
+                    );
+                }
+                KeyboardInput(state, _, Some(key)) => {
+                    use glutin::VirtualKeyCode::*;
+                    match key {
+                        Q | Left => going_left = state == Pressed,
+                        D | Right => going_right = state == Pressed,
+                        T if state == Released => toggled = !toggled,
+                        R if state == Released => reset = true,
+                        _ => {}
+                    }
+                },
+                MouseMoved(x, y) => {
+                    let (w, h, _, _) = scene.data.color_target.get_dimensions();
+                    mouse = Vector2::new((x as f32 / w as f32) - 0.5,
+                                         0.5 - (y as f32 / h as f32));
+                }
+                MouseInput(state, Left) => head_spinning = state == Pressed,
+                _ => {}
+            }
+        }
+
+        let now = precise_time_s() as f32;
+        let delta = now - marker;
+        update_marker.take().map(|um| {
+            println!("update time: {} s", now - um);
+        });
+        fps_counter.update(delta).map(|fps| println!("{} fps", fps));
+        marker = now;
+
+        if head_spinning {
+            let max_rotation = 2.0 * PI * delta;
+            scene.camera.rotate(UnitQuaternion::new(
+                Vector3::y() * (-mouse.x * max_rotation)
+            ));
+            scene.camera.pitch(mouse.y * max_rotation);
+        }
+
+        let speed = 0.5 * PI;
+        if going_left { scene.camera.move_left(speed * delta); }
+        if going_right { scene.camera.move_right(speed * delta); }
+        if toggled { unimplemented!() }
+        if reset {
+            scene.generate_textures(&mut encoder, &mut factory);
+            reset = false;
+            update_marker = Some(precise_time_s() as f32);
+        }
+
+        encoder.clear(&scene.data.color_target, [0.1, 0.2, 0.3, 1.0]);
+        encoder.clear_depth(&scene.data.depth_target, 1.0);
+        scene.render(aspect_ratio, &mut encoder);
+        encoder.flush(&mut device);
+        window.swap_buffers().unwrap();
+        device.cleanup();
+    }
 }
 
 pub struct FpsCounter {
