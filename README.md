@@ -3,9 +3,7 @@
 ## Usage
 
 ```sh
-cargo run --release --bin app [-- sphere_count [texture_size]]
-# or
-./run.sh
+cargo run --release --bin [dynamic | staging] [-- sphere_count [texture_size]]
 ```
 
 ## References
