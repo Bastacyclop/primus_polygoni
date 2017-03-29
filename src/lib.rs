@@ -10,6 +10,7 @@ extern crate rand;
 extern crate noise;
 extern crate image;
 extern crate time;
+extern crate rayon;
 
 pub mod scene;
 mod camera;
@@ -107,7 +108,7 @@ pub fn run<I>(title: &str)
         let now = precise_time_s() as f32;
         let delta = now - marker;
         update_marker.take().map(|um| {
-            println!("update time: {} s", now - um);
+            println!("update time: {} ms", (now - um) * 1_000.);
         });
         fps_counter.update(delta).map(|fps| println!("{} fps", fps));
         marker = now;
@@ -125,9 +126,13 @@ pub fn run<I>(title: &str)
         if going_right { scene.camera.move_right(speed * delta); }
         if toggled { unimplemented!() }
         if reset {
+            print!("generating textures ... ");
+            let before = precise_time_s() as f32;
             scene.generate_textures(&mut encoder, &mut factory);
+            let after = precise_time_s() as f32;
             reset = false;
-            update_marker = Some(precise_time_s() as f32);
+            println!("took {} ms", (after - before) * 1_000.);
+            update_marker = Some(after);
         }
 
         encoder.clear(&scene.data.color_target, [0.1, 0.2, 0.3, 1.0]);

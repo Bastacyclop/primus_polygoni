@@ -13,22 +13,22 @@ pub fn generate(output: &mut [[u8; 4]], size: usize) {
     let mut gen_noise = |i: usize| {
         match choices[i] {
             0 => Box::new(Constant::new(rng.gen_range(0.05f32, 0.95)))
-                    as Box<NoiseModule<[f32; 3], Output=f32>>,
+                    as Box<NoiseModule<[f32; 3], Output=f32> + Sync>,
             1 => Box::new(Fbm::new()
                     .set_seed(rng.gen())
-                    .set_octaves(rng.gen_range(0, 6))
+                    .set_octaves(rng.gen_range(0, 4))
                     .set_frequency(rng.gen_range(0.5, 2.0))
                     .set_lacunarity(rng.gen_range(1.5, 2.5))
                     .set_persistence(rng.gen_range(0.2, 1.0))),
             2 => Box::new(Billow::new()
                     .set_seed(rng.gen())
-                    .set_octaves(rng.gen_range(0, 6))
+                    .set_octaves(rng.gen_range(0, 4))
                     .set_frequency(rng.gen_range(0.5, 2.0))
                     .set_lacunarity(rng.gen_range(1.5, 2.5))
                     .set_persistence(rng.gen_range(0.2, 1.0))),
             _ => Box::new(RidgedMulti::new()
                     .set_seed(rng.gen())
-                    .set_octaves(rng.gen_range(0, 6))
+                    .set_octaves(rng.gen_range(0, 4))
                     .set_frequency(rng.gen_range(0.5, 2.0))
                     .set_lacunarity(rng.gen_range(1.5, 2.5))
                     .set_persistence(rng.gen_range(0.5, 1.0))
@@ -40,24 +40,26 @@ pub fn generate(output: &mut [[u8; 4]], size: usize) {
 }
 
 fn fill<R, G, B>(r: &R, g: &G, b: &B, output: &mut [[u8; 4]], size: usize)
-    where R: NoiseModule<[f32; 3], Output=f32> + ?Sized,
-          G: NoiseModule<[f32; 3], Output=f32> + ?Sized,
-          B: NoiseModule<[f32; 3], Output=f32> + ?Sized
+    where R: NoiseModule<[f32; 3], Output=f32> + ?Sized + Sync,
+          G: NoiseModule<[f32; 3], Output=f32> + ?Sized + Sync,
+          B: NoiseModule<[f32; 3], Output=f32> + ?Sized + Sync
 {
+    use rayon::prelude::*;
+
     debug_assert!(output.len() == 2 * size * size);
-    for y in 0..size {
-        for x in 0..(2 * size) {
+    output.par_chunks_mut(2 * size).enumerate().for_each(|(y, line)| {
+        for (x, texel) in line.iter_mut().enumerate() {
             let theta = (x as f32 / size as f32) * f32::consts::PI;
             let phi = -(y as f32 / size as f32) * f32::consts::PI;
             let p = [phi.sin() * theta.cos(),
                      phi.sin() * theta.sin(),
                      phi.cos()];
-            output[y*2*size + x] = [noise_to_u8(r.get(p)),
-                                    noise_to_u8(g.get(p)),
-                                    noise_to_u8(b.get(p)),
-                                    0xFF];
+            *texel = [noise_to_u8(r.get(p)),
+                      noise_to_u8(g.get(p)),
+                      noise_to_u8(b.get(p)),
+                      0xFF];
         }
-    }
+    });
 }
 
 fn noise_to_u8(v: f32) -> u8 {

@@ -192,7 +192,6 @@ impl<R: gfx::Resources, I: Impl<R>> Scene<R, I> {
                                    factory: &mut F)
         where C: gfx::CommandBuffer<R>, F: gfx::Factory<R>
     {
-        println!("Generating textures");
         I::generate_textures(self, encoder, factory);
     }
 
