@@ -4,9 +4,9 @@ version = "0.1.0"
 authors = ["Thomas Koehler <basta.t.k+git@gmail.com>"]
 
 [dependencies]
-gfx = { git = "https://github.com/gfx-rs/gfx", rev = "9f9a65dbf5a07024c4dd773a40ff56b0a8e87474" }
-gfx_device_gl = { git = "https://github.com/gfx-rs/gfx", rev = "9f9a65dbf5a07024c4dd773a40ff56b0a8e87474" }
-gfx_window_glutin = { git = "https://github.com/gfx-rs/gfx", rev = "9f9a65dbf5a07024c4dd773a40ff56b0a8e87474" }
+gfx = { git = "https://github.com/gfx-rs/gfx", rev = "16f4e20384b8b4e89a0b7402b3743d5de7ce4460" }
+gfx_device_gl = { git = "https://github.com/gfx-rs/gfx", rev = "16f4e20384b8b4e89a0b7402b3743d5de7ce4460" }
+gfx_window_glutin = { git = "https://github.com/gfx-rs/gfx", rev = "16f4e20384b8b4e89a0b7402b3743d5de7ce4460" }
 winit = "^0.5"
 glutin = "^0.7"
 nalgebra = "^0.11"

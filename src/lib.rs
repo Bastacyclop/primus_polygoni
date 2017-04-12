@@ -52,6 +52,7 @@ pub fn run<I>(title: &str)
     let mut aspect_ratio = width as f32 / height as f32;
 
     let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
+    let mut update_encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
 
     let mut scene = Scene::<_, I>::new(sphere_count,
                                        texture_size,
@@ -64,9 +65,9 @@ pub fn run<I>(title: &str)
     let mut head_spinning = false;
     let mut going_left = false;
     let mut going_right = false;
-    let mut toggled = false;
     let mut reset = true;
-    let mut update_marker = None;
+    let mut async = true;
+    println!("♥--♥ async = {} ♥--♥ (when meaningful)", async);
 
     let mut marker = precise_time_s() as f32;
     let mut fps_counter = FpsCounter::new(1.0);
@@ -90,8 +91,11 @@ pub fn run<I>(title: &str)
                     match key {
                         Q | Left => going_left = state == Pressed,
                         D | Right => going_right = state == Pressed,
-                        T if state == Released => toggled = !toggled,
                         R if state == Released => reset = true,
+                        A if state == Released => { 
+                            async = !async;
+                            println!("♥--♥ async = {} ♥--♥", async);
+                        }
                         _ => {}
                     }
                 },
@@ -107,9 +111,6 @@ pub fn run<I>(title: &str)
 
         let now = precise_time_s() as f32;
         let delta = now - marker;
-        update_marker.take().map(|um| {
-            println!("update time: {} ms", (now - um) * 1_000.);
-        });
         fps_counter.update(delta).map(|fps| println!("{} fps", fps));
         marker = now;
 
@@ -124,15 +125,23 @@ pub fn run<I>(title: &str)
         let speed = 0.5 * PI;
         if going_left { scene.camera.move_left(speed * delta); }
         if going_right { scene.camera.move_right(speed * delta); }
-        if toggled { unimplemented!() }
         if reset {
             print!("generating textures ... ");
             let before = precise_time_s() as f32;
-            scene.generate_textures(&mut encoder, &mut factory);
+            scene.generate_textures(&mut update_encoder, &mut factory);
             let after = precise_time_s() as f32;
             reset = false;
             println!("took {} ms", (after - before) * 1_000.);
-            update_marker = Some(after);
+
+            if async {
+                update_encoder.flush(&mut device);
+            } else {
+                let fence = update_encoder.fenced_flush_no_reset(&mut device, None)
+                    .unwrap();
+                device.wait_fence(&fence);
+                update_encoder.reset();
+            }    
+            println!("update time: {} ms", (precise_time_s() as f32 - after) * 1_000.);
         }
 
         encoder.clear(&scene.data.color_target, [0.1, 0.2, 0.3, 1.0]);
