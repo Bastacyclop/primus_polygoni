@@ -1,7 +1,6 @@
-use std::io;
+use std::{io, fs, env};
 use std::io::prelude::*;
-use std::fs;
-use std::env;
+use std::path::Path;
 
 #[derive(Debug)]
 struct Data {
@@ -30,11 +29,7 @@ fn parse(line: &str) -> Data {
     }
 }
 
-fn main() {
-    let mut args = env::args().skip(1);
-    let input = args.next().expect("input file");
-    let output = args.next().expect("output file");
-
+fn transform_csv(input: &Path, output: &Path) {
     let mut r = io::BufReader::new(fs::File::open(input).unwrap());
     let mut w = io::BufWriter::new(fs::File::create(output).unwrap());
 
@@ -70,4 +65,38 @@ fn main() {
     if let Some(p) = prev.take() {
         writeln!(w, "{}, {}, {}, {}", p.id, p.api_duration, p.latency, p.gpu_duration).unwrap();
     }
+}
+
+fn visit_dir<F>(dir: &Path, cb: &F) -> io::Result<()>
+    where F: Fn(&Path, fs::DirEntry)
+{
+    if dir.is_dir() {
+        for entry in try!(fs::read_dir(dir)) {
+            let entry = try!(entry);
+            let path = entry.path();
+            if path.is_dir() {
+                try!(visit_dir(&path, cb));
+            } else {
+                cb(&path, entry);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn main() {
+    let mut args = env::args().skip(1);
+    let directory = args.next().expect("directory");
+
+    visit_dir(directory.as_ref(), &|path, _| {
+        if path.extension().map(|e| e =="csv").unwrap_or(false) {
+            let output = path.with_extension("out");
+            if !output.exists() {
+                println!("{} -> {}", path.display(), output.display());
+                transform_csv(path, &output);
+            }
+        }
+    }).unwrap();
+
+    println!("done!");
 }
