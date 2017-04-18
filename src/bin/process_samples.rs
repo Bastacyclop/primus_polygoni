@@ -77,6 +77,7 @@ struct Value {
     min: f64,
     max: f64,
     sum: f64,
+    sq_sum: f64,
 }
 
 impl Value {
@@ -85,6 +86,7 @@ impl Value {
             min: 1. / 0.,
             max: -1. / 0.,
             sum: 0.,
+            sq_sum: 0.
         }
     }
 
@@ -96,6 +98,18 @@ impl Value {
             self.max = value;
         }
         self.sum += value;
+        self.sq_sum += value.powi(2);
+    }
+
+    fn write<W: io::Write>(&self, n: f64, w: &mut W) {
+        let avg = self.sum / n;
+        let var = self.sq_sum / n - avg.powi(2);
+        write!(w, ",{},{},{},{},{}", self.min, self.max, avg, var, var.sqrt()).unwrap();
+    }
+
+    fn write_header<W: io::Write>(prefix: &str, w: &mut W) {
+        write!(w, ",\"{0}{1}\",\"{0}{2}\",\"{0}{3}\",\"{0}{4}\",\"{0}{5}\"",
+            prefix, "min", "max", "avg", "var", "stddev").unwrap();
     }
 }
 
@@ -106,31 +120,30 @@ fn process_results<W: io::Write>(directory: &Path, w: &mut W) {
     visit_dir(directory,
         &mut |path, _| if path.extension().map(|e| e == "out").unwrap_or(false) {
             let mut r = io::BufReader::new(fs::File::open(path).unwrap());
-            let mut local_api_sum = 0f64;
-            let mut local_gpu_sum = 0f64;
-            let mut local_n = 0f64;
+            let mut api_sum = 0f64;
+            let mut gpu_sum = 0f64;
             let mut line = String::new();
 
             r.read_line(&mut line).unwrap();
             line.clear();
             while r.read_line(&mut line).unwrap() > 0 {
                 let data = parse_out(&line);
-                local_api_sum += data.api_duration;
-                local_gpu_sum += data.gpu_duration;
-                local_n += 1.;
+                api_sum += data.api_duration;
+                gpu_sum += data.gpu_duration;
                 line.clear();
             }
 
-            api_duration.add(local_api_sum / local_n);
-            gpu_duration.add(local_gpu_sum / local_n);
+            api_duration.add(api_sum);
+            gpu_duration.add(gpu_sum);
             n += 1.;
         },
         &mut |_| {}
     ).unwrap();
 
-    writeln!(w, "\"{}\", {}, {}, {}, {}, {}, {}", directory.display(),
-        api_duration.min, api_duration.max, api_duration.sum / n,
-        gpu_duration.min, gpu_duration.max, gpu_duration.sum / n).unwrap();
+    write!(w, "\"{}\"", directory.display()).unwrap();
+    api_duration.write(n, w);
+    gpu_duration.write(n, w);
+    writeln!(w, "").unwrap();
 }
 
 fn visit_dir<F, L>(dir: &Path, file_cb: &mut F, leaf_cb: &mut L) -> io::Result<()>
@@ -161,6 +174,10 @@ fn main() {
 
     let results = Path::new(&directory).join("results");
     let mut w = io::BufWriter::new(fs::File::create(results).unwrap());
+    write!(w, "\"Directory\"").unwrap();
+    Value::write_header("API duration ", &mut w);
+    Value::write_header("GPU duration ", &mut w);
+    writeln!(w, "").unwrap();
 
     visit_dir(directory.as_ref(),
         &mut |path, _| if path.extension().map(|e| e == "csv").unwrap_or(false) {
