@@ -66,7 +66,7 @@ pub fn run<I>(title: &str)
     let mut going_left = false;
     let mut going_right = false;
     let mut reset = true;
-    let mut async = true;
+    let mut async = false;
     println!("♥--♥ async = {} ♥--♥ (when meaningful)", async);
 
     let mut marker = precise_time_s() as f32;

@@ -128,7 +128,7 @@ fn process_results<W: io::Write>(directory: &Path, w: &mut W) {
         &mut |_| {}
     ).unwrap();
 
-    writeln!(w, "{:?}, {}, {}, {}, {}, {}, {}", directory.display(),
+    writeln!(w, "\"{}\", {}, {}, {}, {}, {}, {}", directory.display(),
         api_duration.min, api_duration.max, api_duration.sum / n,
         gpu_duration.min, gpu_duration.max, gpu_duration.sum / n).unwrap();
 }
