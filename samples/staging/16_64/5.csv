@@ -1,0 +1,13 @@
+﻿"Transfer
+ID","API Call","API Start Time
+(μs)","API Duration
+(μs)","Latency
+(μs)","GPU Start Time
+(μs)","GPU Duration
+(μs)","Command
+Buffer ID","Render
+Context ID","Device
+Context ID","Process
+ID"
+"0","glTexSubImage3D","443,665.115","224.370","623.481","444,288.596","0.736","9","0x20000","0x62010B1F","5092"
+"0","glTexSubImage3D","443,665.115","224.370","1,208.763","444,873.878","0.769","10","0x20000","0x62010B1F","5092"
